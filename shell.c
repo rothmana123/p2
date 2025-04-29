@@ -81,6 +81,7 @@ int main(void) {
     size_t len = 0;
 
     while (true) {
+        //1. read input
         if (interactive) {
             char prompt[256];
             char *status_icon = (last_exit_status == 0) ? "🙂" : "🤮"; //change to normal if/else
@@ -107,12 +108,13 @@ int main(void) {
             }
         }
 
+        // 2. Skip empty input
         if (strlen(command) == 0) {
             free(command);
             continue;
         }
 
-        //testing this to make sure it saves full command 
+        //*Add command to history
         // ✅ At this point, 'command' is the full, real command to store:
         if (command[0] != '\0' && command[0] != '!') {
             printf("📦 [main] Sending to hist_add: \"%s\"\n", command);  // 🧪 Debug print
@@ -121,12 +123,13 @@ int main(void) {
 
         //LOG("Input command: %s\n", command);
 
+        // 3. Tokenize input
         char *tokens[MAX_TOKENS];
         tokenize_input(command, tokens, MAX_TOKENS);
 
         //FYI previously had built-in commands here, but history wouldnt work so I moved it after "!" command
 
-        // --- Bang (! command) ---
+        // 4. check history expansion first wit --- Bang (! command) ---
         if (tokens[0][0] == '!') {
             const char *replacement = NULL;
 
@@ -166,8 +169,14 @@ int main(void) {
             }
             tokenize_input(command, tokens, MAX_TOKENS);
         }
+        //*where is the best place to add to history??
+         // // Add to history after any ! expansion
+        // if (command[0] != '\0' && command[0] != '!') {
+        //     hist_add(command);
+        // }
 
-                // --- Built-in: skip comments ---
+        // 5. check built0in cases - where are these added to history?
+        // --- Built-in: skip comments ---
         if (tokens[0][0] == '#') {
             if (interactive) free(command); //normal if/else
             continue;
@@ -199,18 +208,14 @@ int main(void) {
             continue;
         }
 
-        // // Add to history after any ! expansion
-        // if (command[0] != '\0' && command[0] != '!') {
-        //     hist_add(command);
-        // }
-
-    
+       
         //previous forking code was here
+        
+        //6. Check for pipes
         
         // Step 1: Split into pipeline segments
         char **segments[MAX_TOKENS];
         int segment_count = 0;
-
         segments[segment_count++] = tokens;  // first segment
         
         for (int i = 0; tokens[i] != NULL; i++) {
@@ -234,6 +239,8 @@ int main(void) {
 
             pid_t pid = fork();
             if (pid == 0) {
+                signal(SIGINT, SIG_DFL);  // child restores default behavior
+
                 // --- Child process ---
 
                 if (prev_read != -1) {
@@ -287,10 +294,10 @@ int main(void) {
                 }
             }
         
-        else {
-            perror("fork failed");
-            exit(1);
-        }
+            else {
+                perror("fork failed");
+                exit(1);
+            }
         }
 
         // After launching all processes, parent waits
@@ -314,7 +321,6 @@ int main(void) {
     }
 
     hist_destroy();  // free memory
-
     return 0;
 }
 
